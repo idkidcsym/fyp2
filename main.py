@@ -61,9 +61,9 @@ def main():
         load_and_preprocess_data(visualize=args.visualize)
     
     if args.mode == 'train' or args.mode == 'all':  
-         print("\n===== Model Training =====")
-         # Load data
-          X_train, X_test, y_train, y_test = load_processed_data(sample=args.sample, 
+        print("\n===== Model Training =====")
+        # Load data
+        X_train, X_test, y_train, y_test = load_processed_data(sample=args.sample, 
                                                                  max_per_class=args.max_per_class)
         
         # Train selected models
