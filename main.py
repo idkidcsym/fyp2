@@ -18,6 +18,11 @@ def parse_arguments():
     # Data preprocessing options
     parser.add_argument('--visualize', action='store_true',
                         help='Generate visualizations during preprocessing')
+    # Add sample option for training
+    parser.add_argument('--sample', action='store_true',
+                   help='Use a balanced sample of the dataset for faster training')
+    parser.add_argument('--max_per_class', type=int, default=10000,
+                   help='Maximum samples per class when using --sample')
     
     # Training options
     parser.add_argument('--optimize', action='store_true',
@@ -55,10 +60,11 @@ def main():
         print("\n===== Data Preprocessing =====")
         load_and_preprocess_data(visualize=args.visualize)
     
-    if args.mode == 'train' or args.mode == 'all':
-        print("\n===== Model Training =====")
-        # Load data
-        X_train, X_test, y_train, y_test = load_processed_data()
+    if args.mode == 'train' or args.mode == 'all':  
+         print("\n===== Model Training =====")
+         # Load data
+          X_train, X_test, y_train, y_test = load_processed_data(sample=args.sample, 
+                                                                 max_per_class=args.max_per_class)
         
         # Train selected models
         if args.models == 'all':

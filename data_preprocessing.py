@@ -149,17 +149,27 @@ def load_and_preprocess_data(visualize=True):
     for label, count in train_class_dist.items():
         print(f"Class {label}: {count} samples")
     
-    # Apply SMOTE for imbalanced classes if needed
     if len(set(y_train)) > 1:  # Only apply if there's more than one class
-        min_samples = min(train_class_dist.values())
-        if min_samples < 100:
-            print("Applying SMOTE for handling class imbalance...")
-            try:
-                smote = SMOTE(random_state=42)
-                X_train, y_train = smote.fit_resample(X_train, y_train)
-                print("After SMOTE:", Counter(y_train))
-            except Exception as e:
-                print(f"SMOTE failed: {e}. Continuing without it.")
+         min_samples = min(train_class_dist.values())
+         if min_samples < 100:
+             print("Applying SMOTE for handling class imbalance...")
+             try:
+                 # Get classes with fewer than 10,000 samples
+                 # minority_classes = {cls: min(10000, count*10) for cls, count in train_class_dist.items() if count < 10000}
+            
+                # If no minority classes or all classes have >10,000 samples, don't apply SMOTE
+                if minority_classes:
+                     # Create a sampling strategy dictionary
+                      sampling_strategy = minority_classes
+                
+                     # Apply SMOTE with the custom sampling strategy
+                    smote = SMOTE(sampling_strategy=sampling_strategy, random_state=42)
+                     X_train, y_train = smote.fit_resample(X_train, y_train)
+                     print("After SMOTE:", Counter(y_train))
+                 else:
+                print("No minority classes require SMOTE balancing")
+             except Exception as e:
+                 print(f"SMOTE failed: {e}. Continuing without it.")
     
     # Save processed data
     np.save(os.path.join(PROCESSED_DATA_DIR, 'X_train.npy'), X_train)
@@ -175,7 +185,49 @@ def load_and_preprocess_data(visualize=True):
     print("Data preprocessing complete and saved.")
     return X_train, X_test, y_train, y_test
 
-def load_processed_data():
+def create_balanced_sample(X, y, max_per_class=10000):
+    """
+    Create a balanced sample dataset with max_per_class samples per class.
+    
+    Args:
+        X: Features
+        y: Labels
+        max_per_class: Maximum number of samples per class
+        
+    Returns:
+        X_sample, y_sample: Balanced sample dataset
+    """
+    unique_classes = np.unique(y)
+    X_sample_list = []
+    y_sample_list = []
+    
+    for cls in unique_classes:
+        # Get indices for this class
+        indices = np.where(y == cls)[0]
+        
+        # If we have more samples than max_per_class, randomly sample
+        if len(indices) > max_per_class:
+            indices = np.random.choice(indices, max_per_class, replace=False)
+            
+        # Add to our sample lists
+        X_sample_list.append(X[indices])
+        y_sample_list.append(y[indices])
+    
+    # Combine samples from all classes
+    X_sample = np.vstack(X_sample_list)
+    y_sample = np.concatenate(y_sample_list)
+    
+    # Shuffle the samples
+    shuffle_idx = np.random.permutation(len(y_sample))
+    X_sample = X_sample[shuffle_idx]
+    y_sample = y_sample[shuffle_idx]
+    
+    print(f"Created balanced sample with {len(y_sample)} samples")
+    print("Class distribution:", Counter(y_sample))
+    
+    return X_sample, y_sample
+
+def load_processed_data(sample=False, max_per_class=10000):
     """Load preprocessed data if it exists."""
     try:
         X_train = np.load(os.path.join(PROCESSED_DATA_DIR, 'X_train.npy'))
@@ -183,6 +235,12 @@ def load_processed_data():
         y_train = np.load(os.path.join(PROCESSED_DATA_DIR, 'y_train.npy'))
         y_test = np.load(os.path.join(PROCESSED_DATA_DIR, 'y_test.npy'))
         print("Loaded preprocessed data from files.")
+        
+        # Option to create a balanced sample
+        if sample:
+            print("Creating balanced sample for training...")
+            X_train, y_train = create_balanced_sample(X_train, y_train, max_per_class)
+            
         return X_train, X_test, y_train, y_test
     except FileNotFoundError:
         print("Preprocessed data not found. Running preprocessing...")
