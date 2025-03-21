@@ -150,26 +150,24 @@ def load_and_preprocess_data(visualize=True):
         print(f"Class {label}: {count} samples")
     
     if len(set(y_train)) > 1:  # Only apply if there's more than one class
-         min_samples = min(train_class_dist.values())
-         if min_samples < 100:
-             print("Applying SMOTE for handling class imbalance...")
-             try:
-                 # Get classes with fewer than 10,000 samples
-                 # minority_classes = {cls: min(10000, count*10) for cls, count in train_class_dist.items() if count < 10000}
-            
+        min_samples = min(train_class_dist.values())
+        if min_samples < 100:
+            print("Applying SMOTE for handling class imbalance...")
+            try:
+                # Get classes with fewer than 10,000 samples
+                minority_classes = {cls: min(10000, count*10) for cls, count in train_class_dist.items() if count < 10000}
+                
                 # If no minority classes or all classes have >10,000 samples, don't apply SMOTE
                 if minority_classes:
-                     # Create a sampling strategy dictionary
-                      sampling_strategy = minority_classes
-                
-                     # Apply SMOTE with the custom sampling strategy
+                    # Create a sampling strategy dictionary
+                    sampling_strategy = minority_classes
                     smote = SMOTE(sampling_strategy=sampling_strategy, random_state=42)
-                     X_train, y_train = smote.fit_resample(X_train, y_train)
-                     print("After SMOTE:", Counter(y_train))
-                 else:
-                print("No minority classes require SMOTE balancing")
-             except Exception as e:
-                 print(f"SMOTE failed: {e}. Continuing without it.")
+                    X_train, y_train = smote.fit_resample(X_train, y_train)
+                    print("After SMOTE:", Counter(y_train))
+                else:
+                    print("No minority classes require SMOTE balancing")
+            except Exception as e:
+                print(f"SMOTE failed: {e}. Continuing without it.")
     
     # Save processed data
     np.save(os.path.join(PROCESSED_DATA_DIR, 'X_train.npy'), X_train)
