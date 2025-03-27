@@ -1,0 +1,14 @@
+========== Detection Statistics ==========
+Model: random_forest
+Alert Threshold: 0.7
+Total packets processed: 2233
+Alerts raised: 415 (18.58%)
+True Positives: 414
+False Positives: 3
+True Negatives: 1816
+False Negatives: 0
+Accuracy: 0.9987
+Precision: 0.9928
+Recall: 1.0000
+F1 Score: 0.9964
+==========================================
