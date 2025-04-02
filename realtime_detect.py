@@ -11,7 +11,6 @@ import random
 from data_preprocessing import load_processed_data
 from model_training import load_model
 
-# Create real-time logs directory
 LOGS_DIR = './logs/'
 os.makedirs(LOGS_DIR, exist_ok=True)
 
@@ -34,13 +33,11 @@ class PacketGenerator:
         self.packet_queue = queue.Queue(maxsize=100)
         self.log_file = os.path.join(LOGS_DIR, f"packet_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
         
-        # Load feature names if available
         try:
             self.feature_names = pd.read_csv('./processed_data/feature_names.csv')['feature_names'].tolist()
         except:
             self.feature_names = [f"feature_{i}" for i in range(X_test.shape[1])]
         
-        # Initialize log file with header
         with open(self.log_file, 'w') as f:
             f.write("timestamp,packet_id,actual_label\n")
     
@@ -70,13 +67,11 @@ class PacketGenerator:
         
         while self.running:
             if idx >= len(self.X_test):
-                idx = 0  # Reset to beginning of test set
+                idx = 0 
             
-            # Get next packet
             packet_features = self.X_test[idx]
             label = self.y_test[idx]
             
-            # Create packet with metadata
             packet = {
                 'id': packet_id,
                 'features': packet_features,
@@ -84,22 +79,17 @@ class PacketGenerator:
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             }
             
-            # Log packet
             with open(self.log_file, 'a') as f:
                 f.write(f"{packet['timestamp']},{packet_id},{label}\n")
             
-            # Add to queue (non-blocking)
             try:
                 self.packet_queue.put(packet, block=False)
             except queue.Full:
-                # Queue is full, skip this packet
                 pass
             
-            # Increment counters
             packet_id += 1
             idx += 1
             
-            # Sleep between packets (randomize to simulate real traffic patterns)
             delay = random.uniform(0.01, 0.1) / self.speed
             time.sleep(delay)
     
@@ -140,12 +130,10 @@ class NetworkIntrusionDetector:
         self.detection_queue = queue.Queue()
         self.alerts = []
         
-        # Create detection log file
         self.log_file = os.path.join(LOGS_DIR, f"detection_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
         with open(self.log_file, 'w') as f:
             f.write("timestamp,packet_id,predicted_label,actual_label,probability,is_alert\n")
             
-        # Initialize performance metrics
         self.metrics = {
             'true_positives': 0,
             'false_positives': 0,
@@ -155,7 +143,6 @@ class NetworkIntrusionDetector:
             'alerts_raised': 0
         }
         
-        # For visualization
         self.detection_times = []
         self.detection_results = []
         
@@ -173,12 +160,10 @@ class NetworkIntrusionDetector:
         self.running = True
         self.packet_generator = packet_generator
         
-        # Start detection thread
         self.detector_thread = threading.Thread(target=self._detection_loop)
         self.detector_thread.daemon = True
         self.detector_thread.start()
         
-        # Start visualization thread
         self.visualization_thread = threading.Thread(target=self._visualization_loop)
         self.visualization_thread.daemon = True
         self.visualization_thread.start()
@@ -193,24 +178,20 @@ class NetworkIntrusionDetector:
         if hasattr(self, 'visualization_thread'):
             self.visualization_thread.join(timeout=2.0)
         
-        # Print final statistics
         self._print_statistics()
         print("Network Intrusion Detector stopped")
         
     def _detection_loop(self):
         """Main detection loop that processes packets."""
         while self.running:
-            # Get next packet
             packet = self.packet_generator.get_packet()
             if packet is None:
-                time.sleep(0.01)  # Small pause to prevent CPU spinning
+                time.sleep(0.01)  
                 continue
                 
-            # Process the packet
             features = packet['features'].reshape(1, -1)
             start_time = time.time()
             
-            # Make prediction
             prediction = self.model.predict(features)[0]
             probabilities = self.model.predict_proba(features)[0]
             max_prob = max(probabilities)
@@ -218,68 +199,57 @@ class NetworkIntrusionDetector:
             end_time = time.time()
             processing_time = end_time - start_time
             
-            # Determine if this is an alert
             is_alert = (prediction != 0) and (max_prob >= self.alert_threshold)
             if is_alert:
                 self.alerts.append(packet)
                 self.metrics['alerts_raised'] += 1
                 
-            # Update metrics
             self.metrics['processed_packets'] += 1
             if prediction == packet['label']:
-                if prediction == 0:  # True negative
+                if prediction == 0:  
                     self.metrics['true_negatives'] += 1
-                else:  # True positive
+                else:  
                     self.metrics['true_positives'] += 1
             else:
-                if prediction == 0:  # False negative
+                if prediction == 0:  
                     self.metrics['false_negatives'] += 1
-                else:  # False positive
+                else:  
                     self.metrics['false_positives'] += 1
                     
-            # Log detection
             with open(self.log_file, 'a') as f:
                 f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]},"
                         f"{packet['id']},{prediction},{packet['label']},{max_prob:.4f},{1 if is_alert else 0}\n")
                 
-            # Add to visualization data
             self.detection_times.append(time.time())
             self.detection_results.append(prediction)
             
-            # Optional: add a small delay to simulate processing time
-            # time.sleep(random.uniform(0.005, 0.02))
             
     def _visualization_loop(self):
         """Periodically updates the visualization."""
-        plt.ion()  # Turn on interactive mode
+        plt.ion() 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
         fig.canvas.manager.set_window_title('Real-time Network Intrusion Detection')
         
-        # For plotting performance over time
         accuracy_history = []
         alert_history = []
         time_points = []
         start_time = time.time()
         
         while self.running:
-            # Only update every second
             time.sleep(1.0)
             
             if not self.detection_results:
                 continue
                 
-            # Clear previous plots
             ax1.clear()
             ax2.clear()
             
-            # Calculate current accuracy
             if self.metrics['processed_packets'] > 0:
                 current_accuracy = (self.metrics['true_positives'] + self.metrics['true_negatives']) / self.metrics['processed_packets']
                 accuracy_history.append(current_accuracy)
                 alert_history.append(self.metrics['alerts_raised'] / max(1, self.metrics['processed_packets']))
                 time_points.append(time.time() - start_time)
                 
-                # Plot accuracy and alert rate
                 ax1.plot(time_points, accuracy_history, 'b-', label='Accuracy')
                 ax1.plot(time_points, alert_history, 'r-', label='Alert Rate')
                 ax1.set_title('Detection Performance')
@@ -289,7 +259,6 @@ class NetworkIntrusionDetector:
                 ax1.legend()
                 ax1.set_ylim(0, 1)
                 
-            # Plot last 100 detection results
             recent_results = self.detection_results[-100:]
             unique_labels = np.unique(recent_results)
             
@@ -302,18 +271,16 @@ class NetworkIntrusionDetector:
             ax2.set_ylabel('Count')
             ax2.legend()
             
-            # Display metrics in the plot
             stats_text = (f"Processed: {self.metrics['processed_packets']}, "
                           f"Alerts: {self.metrics['alerts_raised']}, "
                           f"TPR: {self._calculate_tpr():.2f}, "
                           f"FPR: {self._calculate_fpr():.2f}")
             fig.suptitle(stats_text)
             
-            # Refresh the plot
             fig.canvas.draw()
             fig.canvas.flush_events()
             
-        plt.ioff()  # Turn off interactive mode when done
+        plt.ioff()  
         
     def _calculate_tpr(self):
         """Calculate True Positive Rate (Recall)."""
@@ -334,7 +301,6 @@ class NetworkIntrusionDetector:
             print("No packets processed")
             return
             
-        # Calculate metrics
         accuracy = (self.metrics['true_positives'] + self.metrics['true_negatives']) / processed
         precision = self.metrics['true_positives'] / max(1, (self.metrics['true_positives'] + self.metrics['false_positives']))
         recall = self._calculate_tpr()
@@ -383,29 +349,23 @@ def start_real_time_detection(model_name='random_forest', speed=1.0, alert_thres
         duration: Duration in seconds to run the simulation
     """
     try:
-        # Load test data
         _, X_test, _, y_test = load_processed_data()
         
-        # Create packet generator
         packet_gen = PacketGenerator(X_test, y_test, speed=speed)
         
-        # Create detector
         detector = NetworkIntrusionDetector(model_name=model_name, alert_threshold=alert_threshold)
         
-        # Start the simulation
         packet_gen.start()
         detector.start(packet_gen)
         
-        # Run for specified duration
         print(f"Running real-time detection for {duration} seconds...")
         time.sleep(duration)
         
-        # Stop the simulation
         detector.stop()
         packet_gen.stop()
         
         print("Real-time detection simulation completed.")
-        return detector  # Return for additional analysis if needed
+        return detector
         
     except Exception as e:
         print(f"Error in real-time detection: {e}")
@@ -416,12 +376,10 @@ def start_real_time_detection(model_name='random_forest', speed=1.0, alert_thres
 
 if __name__ == "__main__":
     try:
-        # Example usage
         start_real_time_detection(
-            model_name='random_forest',  # Can be 'random_forest', 'svm', or 'neural_network'
-            speed=2.0,                   # Speed multiplier (higher is faster)
-            alert_threshold=0.7,         # Probability threshold for alerts
-            duration=120                 # Run for 120 seconds
+            model_name='random_forest',  
+            alert_threshold=0.7,         
+            duration=120                 
         )
     except Exception as e:
         print(f"An error occurred: {e}")

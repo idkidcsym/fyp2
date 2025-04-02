@@ -10,33 +10,26 @@ def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Network Intrusion Detection System')
     
-    # Main operation mode
+
     parser.add_argument('--mode', type=str, default='train',
                         choices=['preprocess', 'train', 'evaluate', 'realtime', 'all'],
                         help='Operation mode')
-    
-    # Data preprocessing options
-    parser.add_argument('--visualize', action='store_true',
-                        help='Generate visualizations during preprocessing')
-    # Add sample option for training
+    parser.add_argument('--visualize', action='store_true',                        help='Generate visualizations during preprocessing')
     parser.add_argument('--sample', action='store_true',
                    help='Use a balanced sample of the dataset for faster training')
     parser.add_argument('--max_per_class', type=int, default=10000,
                    help='Maximum samples per class when using --sample')
     
-    # Training options
     parser.add_argument('--optimize', action='store_true',
                         help='Perform hyperparameter optimization during training')
     parser.add_argument('--models', type=str, default='all',
                         choices=['random_forest', 'svm', 'neural_network', 'all'],
                         help='Models to train')
     
-    # Evaluation options
     parser.add_argument('--model', type=str, default='random_forest',
                         choices=['random_forest', 'svm', 'neural_network', 'best'],
                         help='Model to evaluate or use in real-time detection')
     
-    # Real-time detection options
     parser.add_argument('--speed', type=float, default=1.0,
                         help='Speed multiplier for packet generation')
     parser.add_argument('--threshold', type=float, default=0.8,
@@ -50,7 +43,6 @@ def main():
     """Main entry point of the application."""
     args = parse_arguments()
     
-    # Create necessary directories
     os.makedirs('./processed_data', exist_ok=True)
     os.makedirs('./saved_models', exist_ok=True)
     os.makedirs('./results', exist_ok=True)
@@ -62,11 +54,9 @@ def main():
     
     if args.mode == 'train' or args.mode == 'all':  
         print("\n===== Model Training =====")
-        # Load data
         X_train, X_test, y_train, y_test = load_processed_data(sample=args.sample, 
                                                                  max_per_class=args.max_per_class)
         
-        # Train selected models
         if args.models == 'all':
             from model_training import train_all_models
             train_all_models(X_train, y_train, optimize=args.optimize)
@@ -88,10 +78,8 @@ def main():
     
     if args.mode == 'realtime' or args.mode == 'all':
         print("\n===== Real-time Detection =====")
-        # Load the best model if specified
         model_name = args.model
         if model_name == 'best':
-            # Try to find the best model from previous evaluation
             try:
                 import pandas as pd
                 model_comparison = pd.read_csv('./results/model_comparison.csv')
@@ -102,7 +90,6 @@ def main():
                 model_name = 'random_forest'
                 print(f"Could not determine best model, using {model_name}")
         
-        # Run real-time detection
         start_real_time_detection(
             model_name=model_name,
             speed=args.speed,

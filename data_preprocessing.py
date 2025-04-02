@@ -8,7 +8,6 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 
-# Specify the directory containing the CSV files
 DATA_DIRECTORY = './CICIDS2017'
 PROCESSED_DATA_DIR = './processed_data'
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
@@ -25,7 +24,6 @@ def load_and_preprocess_data(visualize=True):
     """
     print("Loading and preprocessing data...")
     
-    # Load data
     data_frames = []
     for file in os.listdir(DATA_DIRECTORY):
         if file.endswith(".csv"):
@@ -35,14 +33,11 @@ def load_and_preprocess_data(visualize=True):
                 temp_df = pd.read_csv(file_path, low_memory=False)
                 temp_df.columns = temp_df.columns.str.strip()
                 
-                # Remove infinity values
                 temp_df.replace([np.inf, -np.inf], np.nan, inplace=True)
                 
-                # Handle missing values
                 numeric_cols = temp_df.select_dtypes(include=[np.number]).columns
                 temp_df[numeric_cols] = temp_df[numeric_cols].fillna(temp_df[numeric_cols].median())
                 
-                # Forward fill for categorical columns
                 temp_df.ffill(inplace=True)
                 
                 data_frames.append(temp_df)
@@ -52,26 +47,21 @@ def load_and_preprocess_data(visualize=True):
     if not data_frames:
         raise ValueError("No valid data files found in the specified directory.")
     
-    # Combine all data
     print("Combining datasets...")
     full_data = pd.concat(data_frames, ignore_index=True)
     
-    # Rename the label column if it exists with a different name
     if 'Label' not in full_data.columns and ' Label' in full_data.columns:
         full_data.rename(columns={' Label': 'Label'}, inplace=True)
     
-    # Convert attack labels to numeric values
     le = LabelEncoder()
     if full_data['Label'].dtype == 'object':
         print("Encoding labels...")
         full_data['Label'] = le.fit_transform(full_data['Label'])
         
-        # Save encoder mapping for later reference
         label_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
         pd.DataFrame(list(label_mapping.items()), columns=['Attack', 'Code']).to_csv(
             os.path.join(PROCESSED_DATA_DIR, 'label_mapping.csv'), index=False)
     
-    # Display attack distribution
     if visualize:
         print("Generating visualizations...")
         plt.figure(figsize=(12, 6))
@@ -81,43 +71,34 @@ def load_and_preprocess_data(visualize=True):
         plt.xticks(rotation=90)
         plt.savefig(os.path.join(PROCESSED_DATA_DIR, 'attack_distribution.png'), bbox_inches='tight')
         
-    # Split features and target
     X = full_data.drop('Label', axis=1)
     y = full_data['Label']
     
-    # Handle non-numeric columns
     print("Handling non-numeric data...")
     X = X.select_dtypes(include=[np.number])
     
-    # Check for and remove columns with constant values
     constant_columns = [col for col in X.columns if X[col].nunique() <= 1]
     if constant_columns:
         print(f"Removing {len(constant_columns)} constant columns")
         X = X.drop(columns=constant_columns)
     
-    # Fill remaining NaN values with the median of each column
     X.fillna(X.median(), inplace=True)
     
-    # Check for any remaining issues
     if X.isnull().any().any():
         print("Warning: Dataset still contains NaN values. Using forward fill.")
         X.fillna(method='ffill', inplace=True)
-        X.fillna(0, inplace=True)  # Replace any remaining NaNs with 0
+        X.fillna(0, inplace=True) 
     
-    # Scale the features
     print("Scaling features...")
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Save the scaler for future use
     from joblib import dump
     dump(scaler, os.path.join(PROCESSED_DATA_DIR, 'scaler.joblib'))
     
-    # Feature importance analysis
     if visualize:
         from sklearn.ensemble import RandomForestClassifier
         
-        # Use a small subset for feature importance
         sample_size = min(10000, len(X_scaled))
         X_sample = X_scaled[:sample_size]
         y_sample = y[:sample_size]
@@ -137,29 +118,25 @@ def load_and_preprocess_data(visualize=True):
         plt.tight_layout()
         plt.savefig(os.path.join(PROCESSED_DATA_DIR, 'feature_importance.png'))
     
-    # Split data into training and testing sets
     print("Splitting data...")
     X_train, X_test, y_train, y_test = train_test_split(
         X_scaled, y, test_size=0.20, random_state=42, stratify=y if len(y.unique()) < 10 else None
     )
     
-    # Check class imbalance
     print("Class distribution in training set:")
     train_class_dist = Counter(y_train)
     for label, count in train_class_dist.items():
         print(f"Class {label}: {count} samples")
     
-    if len(set(y_train)) > 1:  # Only apply if there's more than one class
+    if len(set(y_train)) > 1: 
         min_samples = min(train_class_dist.values())
         if min_samples < 100:
             print("Applying SMOTE for handling class imbalance...")
             try:
-                # Get classes with fewer than 10,000 samples
+
                 minority_classes = {cls: min(10000, count*10) for cls, count in train_class_dist.items() if count < 10000}
                 
-                # If no minority classes or all classes have >10,000 samples, don't apply SMOTE
                 if minority_classes:
-                    # Create a sampling strategy dictionary
                     sampling_strategy = minority_classes
                     smote = SMOTE(sampling_strategy=sampling_strategy, random_state=42)
                     X_train, y_train = smote.fit_resample(X_train, y_train)
@@ -169,13 +146,11 @@ def load_and_preprocess_data(visualize=True):
             except Exception as e:
                 print(f"SMOTE failed: {e}. Continuing without it.")
     
-    # Save processed data
     np.save(os.path.join(PROCESSED_DATA_DIR, 'X_train.npy'), X_train)
     np.save(os.path.join(PROCESSED_DATA_DIR, 'X_test.npy'), X_test)
     np.save(os.path.join(PROCESSED_DATA_DIR, 'y_train.npy'), y_train)
     np.save(os.path.join(PROCESSED_DATA_DIR, 'y_test.npy'), y_test)
     
-    # Save feature names
     pd.DataFrame({'feature_names': X.columns}).to_csv(
         os.path.join(PROCESSED_DATA_DIR, 'feature_names.csv'), index=False
     )
@@ -200,22 +175,17 @@ def create_balanced_sample(X, y, max_per_class=10000):
     y_sample_list = []
     
     for cls in unique_classes:
-        # Get indices for this class
         indices = np.where(y == cls)[0]
         
-        # If we have more samples than max_per_class, randomly sample
         if len(indices) > max_per_class:
             indices = np.random.choice(indices, max_per_class, replace=False)
             
-        # Add to our sample lists
         X_sample_list.append(X[indices])
         y_sample_list.append(y[indices])
     
-    # Combine samples from all classes
     X_sample = np.vstack(X_sample_list)
     y_sample = np.concatenate(y_sample_list)
     
-    # Shuffle the samples
     shuffle_idx = np.random.permutation(len(y_sample))
     X_sample = X_sample[shuffle_idx]
     y_sample = y_sample[shuffle_idx]
@@ -234,7 +204,6 @@ def load_processed_data(sample=False, max_per_class=10000):
         y_test = np.load(os.path.join(PROCESSED_DATA_DIR, 'y_test.npy'))
         print("Loaded preprocessed data from files.")
         
-        # Option to create a balanced sample
         if sample:
             print("Creating balanced sample for training...")
             X_train, y_train = create_balanced_sample(X_train, y_train, max_per_class)
